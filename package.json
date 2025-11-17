@@ -9,12 +9,16 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/figlet": "^1.7.0"
+    "@types/figlet": "^1.7.0",
+    "@types/jsdom": "^27.0.0"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
-    "figlet": "^1.9.4"
+    "@mozilla/readability": "^0.6.0",
+    "figlet": "^1.9.4",
+    "jsdom": "^27.2.0",
+    "zod": "^4.1.12"
   }
 }
