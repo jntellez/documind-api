@@ -47,7 +47,7 @@ documentRoutes.post("/process-url", async (c) => {
     const responseJson = {
       title: article.title || "Title not found",
       content: cleanHtmlContent,
-      original_url: pageUrl,
+      originalUrl: pageUrl,
     };
     return c.json(responseJson);
   } catch (error) {
