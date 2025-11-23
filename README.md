@@ -1,6 +1,6 @@
-# DocuMind API
+# Documind API
 
-Official backend for the **DocuMind** mobile application. Its main function is to receive a URL from any web article and return a clean version, free of ads and distractions, ready for reading (Reader Mode).
+Official backend for the **Documind** mobile application. Its main function is to receive a URL from any web article and return a clean version, free of ads and distractions, ready for reading (Reader Mode).
 
 Built with **Bun** and **Hono** for maximum performance and low latency.
 
