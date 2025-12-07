@@ -11,7 +11,7 @@ const ProcessUrlRequest = z.object({
 const SaveDocumentRequest = z.object({
   title: z.string().min(1, "Title is required"),
   content: z.string().min(1, "Content is required"),
-  originalUrl: z.string().url(),
+  original_url: z.string().url(),
 });
 
 const pg = new SQL("postgres://postgres:1234@localhost:5433/documinddb");
@@ -56,7 +56,7 @@ documentRoutes.post("/process-url", async (c) => {
     const responseJson = {
       title: article.title || "Title not found",
       content: cleanHtmlContent,
-      originalUrl: pageUrl,
+      original_url: pageUrl,
     };
     return c.json(responseJson);
   } catch (error) {
@@ -97,7 +97,7 @@ documentRoutes.post("/save-document", async (c) => {
       VALUES (
         ${validatedData.title},
         ${validatedData.content},
-        ${validatedData.originalUrl},
+        ${validatedData.original_url},
         ${wordCount},
         ${createdAt},
         ${updatedAt}
