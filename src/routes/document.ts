@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { Readability } from "@mozilla/readability";
 import { JSDOM } from "jsdom";
 import { z } from "zod";
-import { SQL } from "bun";
+import pg from "../db";
 
 const ProcessUrlRequest = z.object({
   url: z.string().url(),
@@ -14,10 +14,8 @@ const SaveDocumentRequest = z.object({
   original_url: z.string().url(),
 });
 
-const pg = new SQL("postgres://postgres:1234@localhost:5433/documinddb");
-
 // Creamos una "sub-app" de Hono para estas rutas
-export const documentRoutes = new Hono();
+const documentRoutes = new Hono();
 
 documentRoutes.post("/process-url", async (c) => {
   try {
@@ -118,3 +116,5 @@ documentRoutes.post("/save-document", async (c) => {
     return c.json({ error: errorMessage, details: error }, 400);
   }
 });
+
+export default documentRoutes;
