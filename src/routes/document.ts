@@ -1,8 +1,10 @@
 import { Hono } from "hono";
 import { Readability } from "@mozilla/readability";
+import { jwt } from "hono/jwt";
 import { JSDOM } from "jsdom";
 import { z } from "zod";
 import pg from "../db";
+import { config } from "../config";
 
 const ProcessUrlRequest = z.object({
   url: z.string().url(),
@@ -61,10 +63,7 @@ documentRoutes.post("/process-url", async (c) => {
     // E. Error handling (ahora es c.json(..., status))
     let errorMessage = "Unknown error";
     if (error instanceof Error) errorMessage = error.message;
-    return c.json(
-      { error: errorMessage, details: error },
-      400 // Hono usa un argumento separado para el status
-    );
+    return c.json({ error: errorMessage, details: error }, 400);
   }
 });
 
@@ -75,46 +74,73 @@ documentRoutes.get("/process-url", (c) => {
   );
 });
 
-documentRoutes.post("/save-document", async (c) => {
-  try {
-    // Validar el body
-    const body = await c.req.json();
-    const validatedData = SaveDocumentRequest.parse(body);
+documentRoutes.post(
+  "/save-document",
+  jwt({ secret: config.jwtSecret }),
+  async (c) => {
+    try {
+      // 3. Obtener el usuario del Token (Seguridad)
+      const payload = c.get("jwtPayload");
+      // Asumimos que tu token tiene el ID en la propiedad 'sub' o 'id'.
+      // Convertimos a Number porque tu DB espera un INTEGER.
+      const userId = Number(payload.sub || payload.id);
 
-    // Campos adicionales
-    const createdAt = new Date();
-    const updatedAt = new Date();
-    const wordCount = validatedData.content
-      .replace(/<[^>]*>/g, "")
-      .split(/\s+/)
-      .filter(Boolean).length;
+      if (!userId) {
+        return c.json({ error: "Invalid user ID in token" }, 401);
+      }
 
-    // Insertar en la base de datos
-    const result = await pg`
-      INSERT INTO documents (title, content, original_url, word_count, created_at, updated_at)
-      VALUES (
-        ${validatedData.title},
-        ${validatedData.content},
-        ${validatedData.original_url},
-        ${wordCount},
-        ${createdAt},
-        ${updatedAt}
-      )
-      RETURNING id, title, original_url, word_count, created_at, updated_at
-    `;
+      // Validar el body (El usuario manda título y contenido, pero NO su ID)
+      const body = await c.req.json();
+      const validatedData = SaveDocumentRequest.parse(body);
 
-    return c.json(
-      {
-        success: true,
-        document: result[0],
-      },
-      201
-    );
-  } catch (error) {
-    let errorMessage = "Unknown error";
-    if (error instanceof Error) errorMessage = error.message;
-    return c.json({ error: errorMessage, details: error }, 400);
+      // Campos adicionales
+      const createdAt = new Date();
+      const updatedAt = new Date();
+      const wordCount = validatedData.content
+        .replace(/<[^>]*>/g, "")
+        .split(/\s+/)
+        .filter(Boolean).length;
+
+      // 4. Insertar en la base de datos INCLUYENDO user_id
+      const result = await pg`
+        INSERT INTO documents (
+            title, 
+            content, 
+            original_url, 
+            word_count, 
+            created_at, 
+            updated_at, 
+            user_id
+        )
+        VALUES (
+          ${validatedData.title},
+          ${validatedData.content},
+          ${validatedData.original_url},
+          ${wordCount},
+          ${createdAt},
+          ${updatedAt},
+          ${userId}
+        )
+        RETURNING id, title, original_url, word_count, created_at, updated_at
+      `;
+
+      return c.json(
+        {
+          success: true,
+          document: result[0],
+        },
+        201
+      );
+    } catch (error) {
+      let errorMessage = "Unknown error";
+      if (error instanceof Error) errorMessage = error.message;
+
+      // Loguear el error en servidor ayuda mucho
+      console.error("Error saving document:", error);
+
+      return c.json({ error: errorMessage, details: error }, 400);
+    }
   }
-});
+);
 
 export default documentRoutes;
