@@ -81,15 +81,13 @@ documentRoutes.post(
     try {
       // 3. Obtener el usuario del Token (Seguridad)
       const payload = c.get("jwtPayload");
-      // Asumimos que tu token tiene el ID en la propiedad 'sub' o 'id'.
-      // Convertimos a Number porque tu DB espera un INTEGER.
       const userId = Number(payload.sub || payload.id);
 
       if (!userId) {
         return c.json({ error: "Invalid user ID in token" }, 401);
       }
 
-      // Validar el body (El usuario manda título y contenido, pero NO su ID)
+      // Validar el body
       const body = await c.req.json();
       const validatedData = SaveDocumentRequest.parse(body);
 
@@ -101,7 +99,7 @@ documentRoutes.post(
         .split(/\s+/)
         .filter(Boolean).length;
 
-      // 4. Insertar en la base de datos INCLUYENDO user_id
+      // 4. Insertar en la base de datos
       const result = await pg`
         INSERT INTO documents (
             title, 
@@ -121,7 +119,7 @@ documentRoutes.post(
           ${updatedAt},
           ${userId}
         )
-        RETURNING id, title, original_url, word_count, created_at, updated_at
+        RETURNING id, title, content, original_url, word_count, created_at, updated_at
       `;
 
       return c.json(
@@ -135,10 +133,143 @@ documentRoutes.post(
       let errorMessage = "Unknown error";
       if (error instanceof Error) errorMessage = error.message;
 
-      // Loguear el error en servidor ayuda mucho
       console.error("Error saving document:", error);
 
       return c.json({ error: errorMessage, details: error }, 400);
+    }
+  }
+);
+
+documentRoutes.get(
+  "/documents",
+  jwt({ secret: config.jwtSecret }),
+  async (c) => {
+    try {
+      // Obtener el usuario del token
+      const payload = c.get("jwtPayload");
+      const userId = Number(payload.sub || payload.id);
+
+      if (!userId) {
+        return c.json({ error: "Invalid user ID in token" }, 401);
+      }
+
+      // Obtener documentos del usuario
+      const documents = await pg`
+        SELECT 
+          id, 
+          title, 
+          original_url, 
+          word_count, 
+          created_at, 
+          updated_at
+        FROM documents
+        WHERE user_id = ${userId}
+        ORDER BY created_at DESC
+      `;
+
+      return c.json({
+        success: true,
+        documents: documents,
+        count: documents.length,
+      });
+    } catch (error) {
+      let errorMessage = "Unknown error";
+      if (error instanceof Error) errorMessage = error.message;
+
+      console.error("Error fetching documents:", error);
+      return c.json({ error: errorMessage }, 400);
+    }
+  }
+);
+
+documentRoutes.get(
+  "/documents/:id",
+  jwt({ secret: config.jwtSecret }),
+  async (c) => {
+    try {
+      const payload = c.get("jwtPayload");
+      const userId = Number(payload.sub || payload.id);
+
+      if (!userId) {
+        return c.json({ error: "Invalid user ID in token" }, 401);
+      }
+
+      const documentId = Number(c.req.param("id"));
+
+      if (!documentId || isNaN(documentId)) {
+        return c.json({ error: "Invalid document ID" }, 400);
+      }
+
+      const documents = await pg`
+        SELECT 
+          id, 
+          title, 
+          content,
+          original_url, 
+          word_count, 
+          created_at, 
+          updated_at
+        FROM documents
+        WHERE id = ${documentId} AND user_id = ${userId}
+      `;
+
+      if (documents.length === 0) {
+        return c.json({ error: "Document not found" }, 404);
+      }
+
+      return c.json({
+        success: true,
+        document: documents[0],
+      });
+    } catch (error) {
+      let errorMessage = "Unknown error";
+      if (error instanceof Error) errorMessage = error.message;
+
+      console.error("Error fetching document:", error);
+      return c.json({ error: errorMessage }, 400);
+    }
+  }
+);
+
+documentRoutes.delete(
+  "/documents/:id",
+  jwt({ secret: config.jwtSecret }),
+  async (c) => {
+    try {
+      const payload = c.get("jwtPayload");
+      const userId = Number(payload.sub || payload.id);
+
+      if (!userId) {
+        return c.json({ error: "Invalid user ID in token" }, 401);
+      }
+
+      const documentId = Number(c.req.param("id"));
+
+      if (!documentId || isNaN(documentId)) {
+        return c.json({ error: "Invalid document ID" }, 400);
+      }
+
+      const result = await pg`
+        DELETE FROM documents
+        WHERE id = ${documentId} AND user_id = ${userId}
+        RETURNING id
+      `;
+
+      if (result.length === 0) {
+        return c.json({ error: "Document not found or unauthorized" }, 404);
+      }
+
+      return c.json({
+        success: true,
+        message: "Document deleted successfully",
+        deletedId: result[0].id,
+      });
+    } catch (error) {
+      let errorMessage = "Unknown error";
+      if (error instanceof Error) errorMessage = error.message;
+
+      console.error("Error deleting document:", error);
+      return c.json({ error: errorMessage }, 400);
     }
   }
 );
