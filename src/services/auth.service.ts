@@ -11,7 +11,7 @@ export const AuthService = {
     provider: Provider,
     code: string,
     redirectUri?: string,
-    codeVerifier?: string
+    codeVerifier?: string,
   ) {
     let userInfo;
 
@@ -54,5 +54,17 @@ export const AuthService = {
     const token = await sign(payload, config.jwtSecret);
 
     return { user, token };
+  },
+
+  async deleteAccount(userId: number) {
+    const [deleted] = await sql`
+      DELETE FROM users WHERE id = ${userId} RETURNING id
+    `;
+
+    if (!deleted) {
+      throw new Error("Usuario no encontrado");
+    }
+
+    return { success: true };
   },
 };

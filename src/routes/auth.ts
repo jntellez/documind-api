@@ -1,4 +1,6 @@
 import { Hono } from "hono";
+import { jwt } from "hono/jwt";
+import { config } from "../config";
 import { AuthService } from "../services/auth.service";
 
 const auth = new Hono();
@@ -15,7 +17,7 @@ auth.post("/login", async (c) => {
       provider,
       code,
       redirectUri,
-      codeVerifier
+      codeVerifier,
     );
 
     return c.json(result);
@@ -24,7 +26,23 @@ auth.post("/login", async (c) => {
     // En producción, no devuelvas el mensaje de error exacto al cliente
     return c.json(
       { error: "Error durante la autenticación", details: String(error) },
-      400
+      400,
+    );
+  }
+});
+
+auth.delete("/delete-account", jwt({ secret: config.jwtSecret }), async (c) => {
+  try {
+    const payload = c.get("jwtPayload");
+    const userId = payload.sub;
+
+    const result = await AuthService.deleteAccount(userId);
+    return c.json(result);
+  } catch (error) {
+    console.error("Delete Account Error:", error);
+    return c.json(
+      { error: "Error al eliminar la cuenta", details: String(error) },
+      400,
     );
   }
 });
